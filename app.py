@@ -178,7 +178,8 @@ def analyze():
     return jsonify({"error": str(e)}), 500
 
 
-if __name__ == "__main__":
-  print("🚀 Server: http://localhost:5000")
-  # ปิด use_reloader เพื่อป้องกัน server รีสตาร์ทเองเวลาเขียนไฟล์รูปภาพใหม่
-  app.run(debug=True, use_reloader=False, port=5000)
+
+
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)

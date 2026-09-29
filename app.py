@@ -18,13 +18,21 @@ app = Flask(__name__, static_folder=".")
 CORS(app)
 
 # ── โหลด model ──
-MODEL_PATH = os.environ.get("MODEL_PATH", "runs/segment/train/weights/best.pt")
+MODEL_PATH = "best.pt"
+
+# ถ้ายังไม่มีไฟล์โมเดลในเซิร์ฟเวอร์ ให้ดาวน์โหลดจาก Google Drive
+if not os.path.exists(MODEL_PATH):
+    print("⏳ กำลังดาวน์โหลดไฟล์ Model จาก Google Drive...")
+    DRIVE_FILE_ID = "1R0UIn9J2m3G6Ikdi4JCupqnvIEaMCKnW"
+    url = f"https://drive.google.com/uc?id={DRIVE_FILE_ID}"
+    gdown.download(url, MODEL_PATH, quiet=False)
+
 try:
-  model = YOLO(MODEL_PATH)
-  print(f"✅ โหลด model สำเร็จ: {MODEL_PATH}")
+    model = YOLO(MODEL_PATH)
+    print(f"✅ โหลด model สำเร็จ: {MODEL_PATH}")
 except Exception as e:
-  print(f"⚠️  โหลด model ไม่ได้: {e}")
-  model = None
+    print(f"⚠️ โหลด model ไม่ได้: {e}")
+    model = None
 
 MIN_AREA_PIXELS = 500
 METERS_PER_PIXEL = 0.025

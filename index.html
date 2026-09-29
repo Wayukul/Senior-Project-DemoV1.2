@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Room Detector</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f0ece4;--bg2:#e8e2d8;--ink:#1a1714;--ink2:#4a4540;--ink3:#9a9088;
+  --accent:#c84b2f;--accent2:#2f6bc8;--line:#ccc5bb;--white:#faf8f4;
+  --green:#16a34a;--r:4px;
+  --mono:'JetBrains Mono',monospace;--sans:'Syne',sans-serif;
+}
+body{background:var(--bg);color:var(--ink);font-family:var(--mono);font-size:13px;height:100vh;overflow:hidden;display:flex;flex-direction:column;}
+
+/* HEADER */
+header{background:var(--ink);padding:0 32px;display:flex;align-items:center;gap:20px;height:50px;flex-shrink:0;}
+.logo{font-family:var(--sans);font-size:16px;font-weight:800;color:var(--white);display:flex;align-items:center;gap:8px;}
+.logo-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);}
+header .spacer{flex:1;}
+.srv{display:flex;align-items:center;gap:7px;font-size:11px;color:#6a6560;}
+.sdot{width:6px;height:6px;border-radius:50%;background:#444;}
+.sdot.ok{background:#4caf50;box-shadow:0 0 5px #4caf5055;}
+.sdot.err{background:var(--accent);}
+
+/* LAYOUT */
+.app{display:flex;flex:1;overflow:hidden;}
+.panel{background:var(--white);border-right:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;}
+.panel.left{width:300px;}
+.panel.right{width:280px;border-right:none;border-left:1px solid var(--line);}
+.sec{padding:14px 16px;border-bottom:1px solid var(--line);flex-shrink:0;}
+.sec.grow{flex:1;overflow-y:auto;}
+.sec-label{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--ink3);margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+.sec-label::after{content:'';flex:1;height:1px;background:var(--line);}
+
+/* UPLOAD */
+.drop-zone{border:1.5px dashed var(--line);border-radius:var(--r);padding:20px 14px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg);display:block;}
+.drop-zone:hover{border-color:var(--accent);background:#fdf4f2;}
+.drop-zone.drag{border-color:var(--accent);background:#fdf4f2;}
+.dz-icon{font-size:26px;margin-bottom:6px;display:block;}
+.dz-title{font-family:var(--sans);font-size:13px;font-weight:700;color:var(--ink);margin-bottom:2px;}
+.dz-sub{font-size:11px;color:var(--ink3);}
+#previewWrap{display:none;margin-top:10px;position:relative;}
+#previewImg{width:100%;display:block;border-radius:var(--r);border:1px solid var(--line);}
+.prev-badge{position:absolute;bottom:5px;left:5px;background:rgba(0,0,0,.65);color:#eee;font-size:10px;padding:2px 7px;border-radius:20px;}
+.rm-img{position:absolute;top:5px;right:5px;background:rgba(0,0,0,.65);color:#eee;border:none;width:20px;height:20px;border-radius:50%;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.rm-img:hover{background:var(--accent);}
+
+/* SETTINGS */
+.srow{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.srow label{flex:1;color:var(--ink2);font-size:11px;}
+.srow input[type=number]{background:var(--bg);border:1px solid var(--line);color:var(--ink);font-family:var(--mono);font-size:11px;padding:4px 6px;border-radius:var(--r);width:72px;outline:none;}
+.srow input[type=number]:focus{border-color:var(--accent2);}
+.srow input[type=range]{width:80px;accent-color:var(--accent);}
+.vbadge{background:var(--bg2);border:1px solid var(--line);border-radius:3px;padding:2px 5px;font-size:10px;color:var(--ink2);min-width:34px;text-align:center;}
+
+/* BUTTONS */
+.btn{width:100%;padding:10px;border-radius:var(--r);font-family:var(--mono);font-size:12px;cursor:pointer;transition:all .15s;margin-top:5px;border:none;}
+.btn-analyze{background:var(--ink);color:var(--white);font-family:var(--sans);font-size:13px;font-weight:700;margin-top:12px;display:flex;align-items:center;justify-content:center;gap:8px;}
+.btn-analyze:hover{background:var(--accent);}
+.btn-analyze:disabled{opacity:.4;cursor:not-allowed;}
+.btn-analyze:disabled:hover{background:var(--ink);}
+.btn-secondary{background:none;border:1px solid var(--line);color:var(--ink2);}
+.btn-secondary:hover{border-color:var(--ink2);}
+.btn-danger{background:none;border:1px solid #f5b0a0;color:#a02323;}
+.btn-danger:hover{background:#fdf0ee;}
+.btn-green{background:linear-gradient(135deg,#14532d,#16a34a);color:#fff;font-weight:700;}
+.btn-green:hover{opacity:.85;}
+.btn-green.drawing{background:linear-gradient(135deg,#7c2d12,#c2410c) !important;animation:pulse .8s ease-in-out infinite alternate;}
+@keyframes pulse{from{opacity:1}to{opacity:.65}}
+.btn-3d{width:100%;padding:11px;background:linear-gradient(135deg,#1a1714,#2f3b52);color:#fff;font-family:var(--sans);font-size:13px;font-weight:800;border:none;border-radius:var(--r);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s;box-shadow:0 3px 12px rgba(0,0,0,.2);}
+.btn-3d:hover{transform:translateY(-1px);box-shadow:0 5px 18px rgba(0,0,0,.25);}
+.btn-3d:disabled{opacity:.35;cursor:not-allowed;transform:none;}
+
+.spinner{width:13px;height:13px;border:2px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:none;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.status{margin-top:8px;padding:8px 10px;border-radius:var(--r);font-size:11px;display:none;line-height:1.6;}
+.status.info{background:#eaf2ff;border:1px solid #b0cbf5;color:#2348a0;}
+.status.error{background:#fdf0ee;border:1px solid #f5b0a0;color:#a02323;}
+.status.success{background:#edfaf0;border:1px solid #a0d8b0;color:#1a7a38;}
+
+/* RESULT */
+.rooms-wrap{display:flex;flex-direction:column;gap:5px;max-height:220px;overflow-y:auto;padding-right:2px;}
+.room-card{background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:7px 9px;display:flex;align-items:center;gap:7px;cursor:pointer;transition:border-color .15s;}
+.room-card:hover{border-color:var(--accent2);}
+.room-card.active{border-color:var(--accent2);background:#eaf2ff;}
+.room-swatch{width:9px;height:30px;border-radius:2px;flex-shrink:0;}
+.room-info{flex:1;}
+.room-name{font-family:var(--sans);font-size:11px;font-weight:700;}
+.room-meta{font-size:10px;color:var(--ink3);display:flex;gap:8px;}
+.cbar-bg{height:3px;background:var(--line);border-radius:2px;overflow:hidden;width:40px;}
+.cbar-fill{height:100%;background:var(--accent2);border-radius:2px;}
+.cbar-num{font-size:9px;color:var(--ink3);margin-top:1px;text-align:center;}
+.no-msg{color:var(--ink3);font-size:11px;text-align:center;padding:12px 0;line-height:1.8;}
+.json-btn{width:100%;background:none;border:1px solid var(--line);color:var(--ink3);font-family:var(--mono);font-size:10px;padding:6px 10px;border-radius:var(--r);cursor:pointer;text-align:left;display:flex;align-items:center;gap:5px;margin-top:8px;}
+.json-btn:hover{border-color:var(--ink2);color:var(--ink2);}
+#jsonPre{display:none;margin-top:5px;background:var(--ink);color:#8ac;border-radius:var(--r);padding:8px;font-size:9px;max-height:130px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;}
+.dl-btn{width:100%;margin-top:5px;padding:7px;background:none;border:1px solid var(--line);color:var(--ink2);font-family:var(--mono);font-size:11px;border-radius:var(--r);cursor:pointer;display:none;}
+.dl-btn:hover{border-color:var(--accent2);color:var(--accent2);}
+
+/* DRAWING HINT */
+.draw-hint{display:none;margin-top:8px;padding:8px 10px;background:#edfaf0;border:1px solid #a0d8b0;border-radius:var(--r);font-size:11px;color:#1a7a38;line-height:1.9;}
+.draw-hint.show{display:block;}
+
+/* CANVAS */
+.canvas-area{flex:1;display:flex;flex-direction:column;background:var(--bg2);overflow:hidden;}
+.c-toolbar{display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--white);border-bottom:1px solid var(--line);flex-shrink:0;}
+.tab{font-family:var(--mono);font-size:11px;color:var(--ink3);padding:4px 10px;border-radius:20px;cursor:pointer;border:1px solid transparent;transition:all .15s;}
+.tab.active{background:var(--ink);color:var(--white);border-color:var(--ink);}
+.c-toolbar .spacer{flex:1;}
+.c-hint{font-size:10px;color:var(--ink3);background:var(--bg);border:1px solid var(--line);padding:3px 10px;border-radius:20px;display:none;}
+.canvas-wrap{flex:1;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;}
+.idle-ph{text-align:center;pointer-events:none;}
+.idle-box{width:140px;height:140px;border:1.5px dashed var(--line);border-radius:4px;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;position:relative;}
+.idle-box::before{content:'';position:absolute;width:70%;height:55%;top:15%;left:10%;border:1px dashed var(--line);}
+.idle-box::after{content:'';position:absolute;width:40%;height:45%;bottom:10%;right:8%;border:1px dashed var(--line);}
+.idle-text{font-size:12px;color:var(--ink3);line-height:2;}
+#editorCanvas{display:none;cursor:crosshair;max-width:100%;max-height:100%;}
+.proc-ov{display:none;position:absolute;inset:0;background:rgba(240,236,228,.85);backdrop-filter:blur(6px);align-items:center;justify-content:center;flex-direction:column;gap:12px;z-index:10;}
+.proc-ov.show{display:flex;}
+.proc-spin{width:32px;height:32px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;}
+
+/* RIGHT PANEL INFO */
+.sel-info{font-size:11px;color:var(--ink3);line-height:1.9;}
+.sel-info strong{color:var(--ink);}
+.edit-hint{background:#eaf2ff;border:1px solid #b0cbf5;border-radius:var(--r);padding:9px 11px;font-size:11px;color:#2348a0;line-height:1.9;display:none;}
+.edit-hint.show{display:block;}
+
+/* 3D MODAL */
+#modal3d{display:none;position:fixed;inset:0;z-index:1000;background:#0a0b0e;flex-direction:column;}
+#modal3d.show{display:flex;}
+.m-header{display:flex;align-items:center;gap:14px;padding:0 22px;height:50px;flex-shrink:0;background:#111318;border-bottom:1px solid #1e2230;}
+.m-title{font-family:var(--sans);font-size:14px;font-weight:800;color:#e8e9ed;}
+.m-title span{color:#5b8dee;}
+.m-header .spacer{flex:1;}
+.m-ctrl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.m-ctrl label{font-size:10px;color:#6b7280;}
+.m-ctrl input[type=range]{width:75px;accent-color:#5b8dee;}
+.m-ctrl input[type=color]{width:26px;height:22px;border:1px solid #2a2d38;border-radius:3px;background:#111;padding:1px;cursor:pointer;}
+.m-ctrl span{font-size:10px;color:#9ca3af;min-width:28px;}
+.close-btn{background:none;border:1px solid #2a2d38;color:#9ca3af;font-family:var(--mono);font-size:11px;padding:5px 12px;border-radius:4px;cursor:pointer;margin-left:14px;}
+.close-btn:hover{border-color:var(--accent);color:var(--accent);}
+#threeCanvas{flex:1;display:block;width:100%;height:100%;}
+.m-footer{display:flex;align-items:center;gap:10px;padding:6px 18px;height:34px;flex-shrink:0;background:#111318;border-top:1px solid #1e2230;font-size:10px;color:#4b5563;}
+.m-footer .dot{width:4px;height:4px;border-radius:50%;background:#2a2d38;}
+
+/* ADVANCED SETTINGS */
+.adv-toggle {
+  width:100%; background:none; border:none; color:var(--ink3);
+  font-family:var(--mono); font-size:10px; letter-spacing:1px;
+  padding:6px 0; cursor:pointer; text-align:left;
+  display:flex; align-items:center; gap:6px;
+  text-transform:uppercase;
+}
+.adv-toggle:hover { color:var(--ink2); }
+.adv-toggle .arr { transition:transform .2s; display:inline-block; }
+.adv-toggle.open .arr { transform:rotate(90deg); }
+.adv-body { display:none; padding-top:6px; border-top:1px dashed var(--line); margin-top:4px; }
+.adv-body.show { display:block; }
+
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><div class="logo-dot"></div>AI Room Detector</div>
+  <div class="spacer"></div>
+  <div class="srv">
+    <div class="sdot" id="sdot"></div>
+    <span id="srvTxt">เชื่อมต่อ...</span>
+  </div>
+</header>
+
+<div class="app">
+
+  <!-- LEFT PANEL -->
+  <div class="panel left">
+    <div class="sec">
+      <div class="sec-label">อัปโหลดแปลน</div>
+      <label class="drop-zone" id="dropZone" for="fileInput">
+        <span class="dz-icon">📐</span>
+        <div class="dz-title">วางหรือคลิกเลือกภาพ</div>
+        <div class="dz-sub">PNG · JPG · JPEG</div>
+      </label>
+      <input type="file" id="fileInput" accept="image/*" style="display:none">
+      <div id="previewWrap">
+        <img id="previewImg" src="" alt="">
+        <button class="rm-img" onclick="clearImage()">✕</button>
+        <div class="prev-badge" id="prevBadge">—</div>
+      </div>
+      <button class="btn btn-analyze" id="analyzeBtn" onclick="doAnalyze()" disabled>
+        <div class="spinner" id="spinner"></div>
+        <span id="btnTxt">วิเคราะห์ด้วย AI</span>
+      </button>
+      <div class="status" id="statusMsg"></div>
+    </div>
+
+    <div class="sec grow">
+      <div class="sec-label">การตั้งค่า</div>
+      <div class="srow"><label>Scale (m/px)</label><input type="number" id="scale" value="0.025" step="0.005" min="0.001"></div>
+
+      <!-- Advanced Settings -->
+      <button class="adv-toggle" id="advToggle" onclick="toggleAdv()">
+        <span class="arr">▶</span> Advanced Settings
+      </button>
+      <div class="adv-body" id="advBody">
+        <div class="srow" style="margin-top:8px;">
+          <label>Confidence</label>
+          <input type="range" id="confRange" min="0.1" max="0.9" step="0.05" value="0.50" oninput="document.getElementById('confVal').textContent=parseFloat(this.value).toFixed(2)">
+          <span class="vbadge" id="confVal">0.50</span>
+        </div>
+        <div class="srow"><label>พื้นที่ขั้นต่ำ (px²)</label><input type="number" id="minArea" value="500" step="100" min="100"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTER (CANVAS) -->
+  <div class="canvas-area">
+    <div class="c-toolbar">
+      <div class="tab active" id="tab-edit" onclick="switchTab('edit')">✏️ แก้ไข</div>
+      <div class="tab" id="tab-orig" onclick="switchTab('orig')">ต้นฉบับ</div>
+      <div class="spacer"></div>
+      <div class="c-hint" id="cHint">📌 คลิกห้อง → ลากจุดขาวปรับมุม</div>
+      <span style="font-size:10px;color:var(--ink3);" id="imgInfo"></span>
+    </div>
+    <div class="canvas-wrap" id="canvasWrap">
+      <div class="proc-ov" id="procOv"><div class="proc-spin"></div><span style="font-family:var(--sans);font-weight:700;color:var(--ink);">กำลังประมวลผล...</span></div>
+      <div class="idle-ph" id="idlePh">
+        <div class="idle-box"><span style="font-size:28px;opacity:.2;">🏠</span></div>
+        <div class="idle-text">ยังไม่มีภาพ<br><strong style="color:var(--ink2);">อัปโหลดแปลน</strong> แล้วกดวิเคราะห์</div>
+      </div>
+      <canvas id="editorCanvas"></canvas>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="panel right">
+    <div class="sec">
+      <div class="sec-label">แก้ไข Polygon</div>
+      <div class="edit-hint" id="editHint">
+        📌 คลิกห้องในภาพเพื่อเลือก<br>
+        🔵 ลากจุดสีขาวเพื่อปรับมุม
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-label">จัดการ Polygon</div>
+      <button class="btn btn-green" id="addZoneBtn" onclick="startAddZone()">＋ เพิ่มโซน Polygon ใหม่</button>
+      <div class="draw-hint" id="drawHint">
+        🖱 คลิกบนภาพเพื่อวางจุด<br>
+        ✅ ดับเบิลคลิก หรือ Enter เพื่อจบ<br>
+        ⌫ Backspace ลบจุดล่าสุด · Esc ยกเลิก
+      </div>
+      <button class="btn btn-danger" onclick="deleteRoom()" style="margin-top:8px;border-color:var(--accent);font-weight:600;">🗑 ลบห้องนี้ทิ้ง</button>
+    </div>
+
+    <div class="sec">
+      <button class="btn-3d" id="btn3d" onclick="open3D()" disabled>⬡ Generate 3D</button>
+    </div>
+
+    <div class="sec">
+      <div class="sec-label">ข้อมูลห้องที่เลือก</div>
+      <div class="sel-info" id="selInfo">ยังไม่ได้เลือก</div>
+      
+      <!-- ฟังก์ชันเลือกและพิมพ์ชื่อห้อง -->
+      <div id="roomEditControls" style="display:none; margin-top:10px;">
+        <label style="font-size:10px; color:var(--ink3); display:block; margin-bottom:4px;">ประเภท/ชื่อห้อง:</label>
+        <select id="roomTypeSelect" onchange="changeRoomType(this.value)" style="width:100%; padding:6px; font-family:var(--sans); font-size:11px; border-radius:var(--r); border:1px solid var(--line); background:var(--bg); color:var(--ink);">
+          <option value="Living Room">🛋️ Living Room (ห้องนั่งเล่น)</option>
+          <option value="Bedroom">🛏️ Bedroom (ห้องนอน)</option>
+          <option value="Kitchen">🍳 Kitchen (ห้องครัว)</option>
+          <option value="Bathroom">🚿 Bathroom (ห้องน้ำ)</option>
+          <option value="Balcony">🌿 Balcony (ระเบียง)</option>
+          <option value="Custom">✏️ กำหนดเอง...</option>
+        </select>
+        <input type="text" id="customRoomName" oninput="changeRoomName(this.value)" placeholder="พิมพ์ชื่อห้องเอง..." style="display:none; width:100%; margin-top:5px; padding:5px 8px; font-size:11px; border:1px solid var(--line); border-radius:var(--r); background:var(--bg); color:var(--ink);">
+      </div>
+    </div>
+
+    <!-- ส่วนผลลัพธ์ย้ายมาขวา -->
+    <div class="sec grow">
+      <div class="sec-label">ผลลัพธ์ทั้งหมด</div>
+      <div class="rooms-wrap" id="roomList">
+        <div class="no-msg">ยังไม่มีผลลัพธ์<br>อัปโหลดแปลนแล้วกดวิเคราะห์</div>
+      </div>
+      <button class="json-btn" id="jsonBtn" onclick="toggleJson()" style="display:none">▶ ดู JSON</button>
+      <pre id="jsonPre"></pre>
+      <button class="dl-btn" id="dlBtn" onclick="dlJson()">⬇ ดาวน์โหลด JSON</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- 3D MODAL -->
+<div id="modal3d">
+  <div class="m-header">
+    <div class="m-title">⬡ Floor Plan <span>3D View</span></div>
+    <div class="spacer"></div>
+    <div class="m-ctrl">
+      <label>ความสูงผนัง</label>
+      <input type="range" id="wallH" min="1.5" max="5" step="0.1" value="2.8" oninput="wallHVal.textContent=parseFloat(this.value).toFixed(1)+'m';rebuild3D()">
+      <span id="wallHVal">2.8m</span>
+      <label style="margin-left:8px;">สีผนัง</label>
+      <input type="color" id="wallClr" value="#d4cec6" oninput="rebuild3D()">
+      <label>สีพื้น</label>
+      <input type="color" id="floorClr" value="#a09080" oninput="rebuild3D()">
+    </div>
+    <button class="close-btn" onclick="close3D()">✕ ปิด</button>
+  </div>
+  <canvas id="threeCanvas"></canvas>
+  <div class="m-footer">
+    <div class="dot"></div><span>คลิกลาก = หมุน</span>
+    <div class="dot"></div><span>Scroll = ซูม</span>
+    <div class="dot"></div><span>คลิกขวาลาก = เลื่อน</span>
+    <div class="dot"></div><span id="roomCount3d"></span>
+  </div>
+</div>
+
+<script>
+/* ================================================================
+   STATE
+================================================================ */
+const API = 'http://localhost:5000';
+let rooms = [], origRooms = [];
+let selIdx = -1, activeCorner = -1;
+let isDrag = false;
+let bgImg = null, origImgSrc = null;
+let curTab = 'edit';
+let jsonOpen = false, resultJson = null;
+let cvScale = 1;
+let isDrawing = false, drawPts = [], mPos = [0,0];
+let snapInfo = null;
+
+const cv = document.getElementById('editorCanvas');
+const cx = cv.getContext('2d');
+const HR = 5;
+
+/* ================================================================
+   SERVER PING
+================================================================ */
+async function ping() {
+  try {
+    await fetch(API+'/', {method:'HEAD', signal:AbortSignal.timeout(2000)});
+    sdot.className='sdot ok'; srvTxt.textContent='Server พร้อม';
+  } catch {
+    sdot.className='sdot err'; srvTxt.textContent='ไม่สามารถเชื่อมต่อ :5000';
+  }
+}
+const sdot = document.getElementById('sdot');
+const srvTxt = document.getElementById('srvTxt');
+ping(); setInterval(ping, 8000);
+
+/* ================================================================
+   FILE UPLOAD
+================================================================ */
+const fi = document.getElementById('fileInput');
+const dz = document.getElementById('dropZone');
+
+fi.addEventListener('change', () => { if (fi.files[0]) loadFile(fi.files[0]); });
+['dragenter','dragover'].forEach(e => dz.addEventListener(e, ev => { ev.preventDefault(); dz.classList.add('drag'); }));
+['dragleave','drop'].forEach(e => dz.addEventListener(e, ev => { ev.preventDefault(); dz.classList.remove('drag'); }));
+dz.addEventListener('drop', ev => { const f = ev.dataTransfer.files[0]; if (f) loadFile(f); });
+
+function loadFile(file) {
+  const r = new FileReader();
+  r.onload = e => {
+    origImgSrc = e.target.result;
+    document.getElementById('previewImg').src = e.target.result;
+    document.getElementById('previewWrap').style.display = 'block';
+    document.getElementById('prevBadge').textContent = file.name + ' · ' + (file.size/1024).toFixed(0) + ' KB';
+    document.getElementById('analyzeBtn').disabled = false;
+  };
+  r.readAsDataURL(file);
+}
+
+function clearImage() {
+  origImgSrc = null; bgImg = null; rooms = []; origRooms = []; selIdx = -1;
+  fi.value = '';
+  document.getElementById('previewWrap').style.display = 'none';
+  document.getElementById('previewImg').src = '';
+  document.getElementById('analyzeBtn').disabled = true;
+  document.getElementById('btn3d').disabled = true;
+  cv.style.display = 'none';
+  document.getElementById('idlePh').style.display = 'block';
+  document.getElementById('totalCard')?.style.setProperty('display', 'none');
+  document.getElementById('cHint').style.display = 'none';
+  document.getElementById('editHint').classList.remove('show');
+  document.getElementById('roomList').innerHTML = '<div class="no-msg">ยังไม่มีผลลัพธ์</div>';
+  document.getElementById('jsonBtn').style.display = 'none';
+  document.getElementById('dlBtn').style.display = 'none';
+  updSelInfo();
+}
+
+/* ================================================================
+   ANALYZE
+================================================================ */
+async function doAnalyze() {
+  if (!fi.files[0]) return;
+  setLoad(true);
+  setStatus('info','🔍 กำลังส่งภาพให้ YOLO วิเคราะห์...');
+  document.getElementById('procOv').classList.add('show');
+
+  const form = new FormData();
+  form.append('image', fi.files[0]);
+  form.append('conf',  document.getElementById('confRange').value);
+  form.append('scale', document.getElementById('scale').value);
+  form.append('minArea', document.getElementById('minArea').value);
+
+  try {
+    const res = await fetch(API+'/analyze', {method:'POST', body:form});
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error||'HTTP '+res.status); }
+    const data = await res.json();
+    resultJson = data;
+    rooms = data.rooms.map(r => ({...r, custom_name: 'Room ' + r.room_id, corners: r.corners.map(c=>[...c])}));
+    origRooms = JSON.parse(JSON.stringify(rooms));
+
+    bgImg = new Image();
+    bgImg.onload = () => {
+      initCV();
+      document.getElementById('idlePh').style.display = 'none';
+      cv.style.display = 'block';
+      document.getElementById('editHint').classList.add('show');
+      document.getElementById('cHint').style.display = 'block';
+      document.getElementById('imgInfo').textContent = bgImg.naturalWidth+'×'+bgImg.naturalHeight+' px';
+      drawAll();
+    };
+    bgImg.src = origImgSrc;
+
+    document.getElementById('btn3d').disabled = false;
+    renderRoomList();
+    document.getElementById('jsonPre').textContent = JSON.stringify(data,null,2);
+    document.getElementById('jsonBtn').style.display = 'flex';
+    document.getElementById('dlBtn').style.display = 'block';
+    setStatus('success','✅ พบ '+data.room_count+' ห้อง · รวม '+data.total_area_m2+' m²');
+  } catch(err) {
+    setStatus('error','❌ '+err.message);
+  } finally {
+    setLoad(false);
+    document.getElementById('procOv').classList.remove('show');
+  }
+}
+
+/* ================================================================
+   CANVAS
+================================================================ */
+function initCV() {
+  const wrap = document.getElementById('canvasWrap');
+  const mw = wrap.clientWidth - 28, mh = wrap.clientHeight - 28;
+  cvScale = Math.min(mw/bgImg.naturalWidth, mh/bgImg.naturalHeight, 1);
+  cv.width  = Math.round(bgImg.naturalWidth  * cvScale);
+  cv.height = Math.round(bgImg.naturalHeight * cvScale);
+}
+
+window.addEventListener('resize', () => { if (bgImg) { initCV(); drawAll(); } });
+
+/* ================================================================
+   ANGLE SNAP
+================================================================ */
+const SNAP_DEG = 8;
+
+function angleSnap(mx, my, pts, cornerIdx) {
+  const n = pts.length;
+  const neighbors = [
+    pts[(cornerIdx - 1 + n) % n],
+    pts[(cornerIdx + 1) % n]
+  ];
+
+  let bestX = mx, bestY = my, snapped = false, bestAngle = null, bestAxis = '';
+
+  for (const nb of neighbors) {
+    const dx = mx - nb[0], dy = my - nb[1];
+    if (Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001) continue;
+    const angleDeg = Math.atan2(dy, dx) * 180 / Math.PI;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+
+    const axes = [
+      { angle: 0,   label: '→ 0°',   x: nb[0]+dist, y: nb[1] },
+      { angle: 90,  label: '↓ 90°',  x: nb[0],      y: nb[1]+dist },
+      { angle: 180, label: '← 180°', x: nb[0]-dist, y: nb[1] },
+      { angle: -90, label: '↑ 90°',  x: nb[0],      y: nb[1]-dist },
+    ];
+
+    for (const ax of axes) {
+      let diff = Math.abs(angleDeg - ax.angle);
+      if (diff > 180) diff = 360 - diff;
+      if (diff < SNAP_DEG) {
+        if (ax.angle === 0 || ax.angle === 180) {
+          bestX = mx; bestY = nb[1];
+        } else {
+          bestX = nb[0]; bestY = my;
+        }
+        snapped = true;
+        bestAngle = diff < (bestAngle ?? 999) ? diff : bestAngle;
+        bestAxis = ax.label;
+      }
+    }
+  }
+
+  return { x: bestX, y: bestY, snapped, axis: bestAxis };
+}
+
+function drawAll() {
+  if (!bgImg) return;
+  cx.clearRect(0,0,cv.width,cv.height);
+  cx.drawImage(bgImg, 0, 0, cv.width, cv.height);
+  if (curTab === 'orig') return;
+
+  rooms.forEach((room, idx) => {
+    const pts = room.corners;
+    if (!pts || pts.length < 2) return;
+    const isSel = idx === selIdx;
+    const color = room.color || '#888';
+
+    cx.beginPath();
+    cx.moveTo(pts[0][0]*cvScale, pts[0][1]*cvScale);
+    for (let i=1; i<pts.length; i++) cx.lineTo(pts[i][0]*cvScale, pts[i][1]*cvScale);
+    cx.closePath();
+    cx.globalAlpha = isSel ? 0.38 : 0.22;
+    cx.fillStyle = color; cx.fill();
+    cx.globalAlpha = 1;
+    cx.strokeStyle = isSel ? '#fff' : color;
+    cx.lineWidth = isSel ? 2.5 : 1.5;
+    cx.stroke();
+
+    const ccx = pts.reduce((s,p)=>s+p[0],0)/pts.length*cvScale;
+    const ccy = pts.reduce((s,p)=>s+p[1],0)/pts.length*cvScale;
+
+    // ── วาด Badge แคปซูลชื่อห้อง + พื้นที่ (สไตล์ Modern UI) ──
+    const nameText = room.custom_name || ('Room ' + room.room_id);
+    const areaText = room.area_m2 + ' m²';
+
+    cx.font = 'bold 11px Syne, sans-serif';
+    const nw = cx.measureText(nameText).width;
+    cx.font = '10px JetBrains Mono, monospace';
+    const aw = cx.measureText(areaText).width;
+    const badgeW = Math.max(nw, aw) + 18;
+    const badgeH = 34;
+    const bx = ccx - badgeW / 2;
+    const by = ccy - badgeH / 2;
+
+    cx.save();
+    cx.shadowColor = 'rgba(0,0,0,0.35)';
+    cx.shadowBlur = 8;
+    cx.shadowOffsetY = 2;
+    cx.fillStyle = isSel ? 'rgba(20, 24, 33, 0.95)' : 'rgba(28, 32, 42, 0.82)';
+    cx.beginPath();
+    cx.roundRect(bx, by, badgeW, badgeH, 6);
+    cx.fill();
+
+    if (isSel) {
+      cx.strokeStyle = '#60a5fa';
+      cx.lineWidth = 1.5;
+      cx.stroke();
+    }
+    cx.restore();
+
+    cx.textAlign = 'center';
+    cx.textBaseline = 'middle';
+    cx.fillStyle = '#ffffff';
+    cx.font = 'bold 11px Syne, sans-serif';
+    cx.fillText(nameText, ccx, ccy - 7);
+
+    cx.fillStyle = '#93c5fd';
+    cx.font = '10px JetBrains Mono, monospace';
+    cx.fillText(areaText, ccx, ccy + 7);
+
+    if (isSel) {
+      pts.forEach((p,ci) => {
+        cx.beginPath();
+        cx.arc(p[0]*cvScale, p[1]*cvScale, activeCorner===ci ? HR+2 : HR, 0, Math.PI*2);
+        cx.fillStyle   = activeCorner===ci ? '#f59e0b' : '#fff';
+        cx.strokeStyle = activeCorner===ci ? '#92400e' : color;
+        cx.lineWidth=1.5; cx.fill(); cx.stroke();
+      });
+    }
+  });
+
+  if (snapInfo && snapInfo.snapped && selIdx>=0 && activeCorner>=0) {
+    const p = rooms[selIdx].corners[activeCorner];
+    const px = p[0]*cvScale, py = p[1]*cvScale;
+
+    cx.beginPath();
+    cx.arc(px, py, HR+5, 0, Math.PI*2);
+    cx.strokeStyle = '#f59e0b';
+    cx.lineWidth = 2;
+    cx.stroke();
+
+    const label = '⊾ ' + snapInfo.axis;
+    cx.font = 'bold 12px JetBrains Mono,monospace';
+    const tw = cx.measureText(label).width;
+    cx.fillStyle = 'rgba(245,158,11,0.9)';
+    cx.beginPath();
+    cx.roundRect(px+10, py-22, tw+12, 20, 4);
+    cx.fill();
+    cx.fillStyle = '#1a1714';
+    cx.textAlign = 'left';
+    cx.shadowBlur = 0;
+    cx.fillText(label, px+16, py-7);
+
+    cx.strokeStyle = 'rgba(245,158,11,0.4)';
+    cx.lineWidth = 1;
+    cx.setLineDash([4,3]);
+    cx.beginPath(); cx.moveTo(0,py); cx.lineTo(cv.width,py); cx.stroke();
+    cx.beginPath(); cx.moveTo(px,0); cx.lineTo(px,cv.height); cx.stroke();
+    cx.setLineDash([]);
+  }
+
+  if (isDrawing) {
+    cx.save();
+    cx.strokeStyle = '#22c55e'; cx.lineWidth = 2;
+
+    if (drawPts.length > 0) {
+      cx.setLineDash([]);
+      cx.beginPath();
+      cx.moveTo(drawPts[0][0]*cvScale, drawPts[0][1]*cvScale);
+      for (let i=1; i<drawPts.length; i++) cx.lineTo(drawPts[i][0]*cvScale, drawPts[i][1]*cvScale);
+      cx.stroke();
+
+      cx.setLineDash([5,4]);
+      cx.beginPath();
+      cx.moveTo(drawPts[drawPts.length-1][0]*cvScale, drawPts[drawPts.length-1][1]*cvScale);
+      cx.lineTo(mPos[0]*cvScale, mPos[1]*cvScale);
+      cx.stroke();
+
+      if (drawPts.length >= 2) {
+        cx.globalAlpha=0.3; cx.setLineDash([3,5]);
+        cx.beginPath();
+        cx.moveTo(mPos[0]*cvScale, mPos[1]*cvScale);
+        cx.lineTo(drawPts[0][0]*cvScale, drawPts[0][1]*cvScale);
+        cx.stroke();
+        cx.setLineDash([]); cx.globalAlpha=1;
+      }
+    }
+
+    drawPts.forEach((p,i) => {
+      cx.beginPath();
+      cx.arc(p[0]*cvScale, p[1]*cvScale, i===0?HR+3:HR, 0, Math.PI*2);
+      cx.fillStyle = i===0 ? '#22c55e' : '#fff';
+      cx.strokeStyle='#22c55e'; cx.lineWidth=2;
+      cx.fill(); cx.stroke();
+    });
+
+    cx.setLineDash([]);
+    cx.beginPath();
+    cx.arc(mPos[0]*cvScale, mPos[1]*cvScale, 4, 0, Math.PI*2);
+    cx.fillStyle='rgba(34,197,94,0.5)'; cx.fill();
+
+    cx.font='bold 11px JetBrains Mono,monospace';
+    cx.fillStyle='#22c55e'; cx.textAlign='left';
+    cx.shadowColor='rgba(0,0,0,.9)'; cx.shadowBlur=4;
+    cx.fillText(
+      drawPts.length===0 ? 'คลิกเพื่อเริ่มวางจุด' : drawPts.length+' จุด — Enter=จบ  Esc=ยกเลิก',
+      mPos[0]*cvScale+12, mPos[1]*cvScale-8
+    );
+    cx.shadowBlur=0;
+    cx.restore();
+  }
+}
+
+/* ================================================================
+   MOUSE / TOUCH
+================================================================ */
+cv.addEventListener('mousedown',  onDown);
+cv.addEventListener('mousemove',  onMove);
+cv.addEventListener('mouseup',    onUp);
+cv.addEventListener('mouseleave', onUp);
+cv.addEventListener('touchstart', e=>{e.preventDefault();onDown(e.touches[0]);},{passive:false});
+cv.addEventListener('touchmove',  e=>{e.preventDefault();onMove(e.touches[0]);},{passive:false});
+cv.addEventListener('touchend',   e=>{e.preventDefault();onUp();},{passive:false});
+cv.addEventListener('dblclick', e => {
+  if (!isDrawing) return;
+  if (drawPts.length > 0) drawPts.pop();
+  if (drawPts.length >= 3) finishZone();
+  else cancelZone();
+});
+
+function cvXY(e) {
+  const r = cv.getBoundingClientRect();
+  return [(e.clientX-r.left)/cvScale, (e.clientY-r.top)/cvScale];
+}
+
+function onDown(e) {
+  const [mx,my] = cvXY(e);
+
+  if (isDrawing) {
+    drawPts.push([Math.round(mx), Math.round(my)]);
+    drawAll();
+    return;
+  }
+
+  if (selIdx >= 0) {
+    const pts = rooms[selIdx].corners;
+    for (let i=0; i<pts.length; i++) {
+      const dx=pts[i][0]-mx, dy=pts[i][1]-my;
+      if (Math.sqrt(dx*dx+dy*dy) < (HR+5)/cvScale) {
+        activeCorner=i; isDrag=true;
+        cv.style.cursor='grabbing';
+        return;
+      }
+    }
+  }
+
+  for (let i=rooms.length-1; i>=0; i--) {
+    if (ptInPoly(mx,my,rooms[i].corners)) {
+      selIdx=i; activeCorner=-1;
+      drawAll(); renderRoomList(); updSelInfo();
+      return;
+    }
+  }
+
+  selIdx=-1; activeCorner=-1;
+  drawAll(); renderRoomList(); updSelInfo();
+}
+
+function onMove(e) {
+  const [mx,my] = cvXY(e);
+  mPos = [mx,my];
+
+  if (isDrawing) { drawAll(); return; }
+
+  if (isDrag && activeCorner>=0 && selIdx>=0) {
+    const pts = rooms[selIdx].corners;
+    const snap = angleSnap(
+      Math.max(0,Math.min(bgImg.naturalWidth, mx)),
+      Math.max(0,Math.min(bgImg.naturalHeight,my)),
+      pts, activeCorner
+    );
+    rooms[selIdx].corners[activeCorner] = [snap.x, snap.y];
+    snapInfo = snap.snapped ? snap : null;
+    drawAll();
+    return;
+  }
+
+  if (selIdx>=0) {
+    const onH = rooms[selIdx].corners.some(p => {
+      const dx=p[0]-mx, dy=p[1]-my;
+      return Math.sqrt(dx*dx+dy*dy) < (HR+5)/cvScale;
+    });
+    cv.style.cursor = onH ? 'grab' : 'crosshair';
+  }
+}
+
+function onUp() {
+  snapInfo = null;
+  if (isDrag && selIdx>=0) {
+    recalcRoom(selIdx);
+    updSelInfo(); updJson();
+    drawAll();
+  }
+  isDrag=false; activeCorner=-1;
+  cv.style.cursor = isDrawing ? 'crosshair' : 'crosshair';
+}
+
+window.addEventListener('keydown', e => {
+  if (isDrawing) {
+    if (e.key==='Enter')     { e.preventDefault(); if(drawPts.length>=3) finishZone(); else cancelZone(); }
+    if (e.key==='Escape')    { cancelZone(); }
+    if (e.key==='Backspace') { e.preventDefault(); if(drawPts.length>0){drawPts.pop();drawAll();} }
+  } else {
+    if (e.key==='Escape')    { selIdx=-1; activeCorner=-1; drawAll(); renderRoomList(); updSelInfo(); }
+    if ((e.key==='Delete'||e.key==='Backspace') && activeCorner>=0) deleteSelectedCorner();
+  }
+});
+
+/* ================================================================
+   HELPERS
+================================================================ */
+function ptInPoly(x,y,pts) {
+  let inside=false;
+  for (let i=0,j=pts.length-1; i<pts.length; j=i++) {
+    const [xi,yi]=[pts[i][0],pts[i][1]], [xj,yj]=[pts[j][0],pts[j][1]];
+    if (((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi)+xi)) inside=!inside;
+  }
+  return inside;
+}
+
+function polyArea(pts) {
+  let a=0;
+  for (let i=0,j=pts.length-1; i<pts.length; j=i++)
+    a+=(pts[j][0]+pts[i][0])*(pts[j][1]-pts[i][1]);
+  return Math.abs(a/2);
+}
+
+function recalcRoom(idx) {
+  if (idx<0||idx>=rooms.length) return;
+  const mpp = parseFloat(document.getElementById('scale').value)||0.025;
+  const ap = polyArea(rooms[idx].corners);
+  rooms[idx].area_px = Math.round(ap);
+  rooms[idx].area_m2 = Math.round(ap*mpp*mpp*100)/100;
+}
+
+function updTotal() {
+  const t = rooms.reduce((s,r)=>s+r.area_m2,0);
+}
+
+function updJson() {
+  const t = rooms.reduce((s,r)=>s+r.area_m2,0);
+  resultJson = {rooms, total_area_m2:Math.round(t*100)/100, room_count:rooms.length};
+  if (jsonOpen) document.getElementById('jsonPre').textContent = JSON.stringify(resultJson,null,2);
+}
+
+function updSelInfo() {
+  const el = document.getElementById('selInfo');
+  const ctrl = document.getElementById('roomEditControls');
+  const sel = document.getElementById('roomTypeSelect');
+  const customInp = document.getElementById('customRoomName');
+
+  if (selIdx < 0) {
+    el.textContent = 'ยังไม่ได้เลือก';
+    if (ctrl) ctrl.style.display = 'none';
+    return;
+  }
+
+  const r = rooms[selIdx];
+  const displayName = r.custom_name || ('Room ' + r.room_id);
+  el.innerHTML = '<strong>' + displayName + '</strong><br>พื้นที่: ' + r.area_m2 + ' m²<br>พิกเซล: ' + (r.area_px || 0).toLocaleString() + ' px²<br>confidence: ' + (r.confidence * 100).toFixed(0) + '%<br>จำนวนจุด: ' + r.corners.length;
+
+  if (ctrl) {
+    ctrl.style.display = 'block';
+    const standardTypes = ['Living Room', 'Bedroom', 'Kitchen', 'Bathroom', 'Balcony'];
+    if (standardTypes.includes(r.custom_name)) {
+      sel.value = r.custom_name;
+      customInp.style.display = 'none';
+    } else if (r.custom_name && !r.custom_name.startsWith('Room ')) {
+      sel.value = 'Custom';
+      customInp.style.display = 'block';
+      customInp.value = r.custom_name;
+    } else {
+      sel.value = 'Living Room';
+      customInp.style.display = 'none';
+    }
+  }
+}
+
+function changeRoomType(val) {
+  if (selIdx < 0) return;
+  const customInp = document.getElementById('customRoomName');
+  if (val === 'Custom') {
+    customInp.style.display = 'block';
+    customInp.value = rooms[selIdx].custom_name || '';
+    customInp.focus();
+  } else {
+    customInp.style.display = 'none';
+    rooms[selIdx].custom_name = val;
+    applyNameChange();
+  }
+}
+
+function changeRoomName(val) {
+  if (selIdx < 0) return;
+  rooms[selIdx].custom_name = val.trim() ? val : ('Room ' + rooms[selIdx].room_id);
+  applyNameChange();
+}
+
+function applyNameChange() {
+  drawAll();
+  renderRoomList();
+  updSelInfo();
+  updJson();
+}
+
+/* ================================================================
+   ROOM LIST
+================================================================ */
+function renderRoomList() {
+  const el = document.getElementById('roomList');
+  if (!rooms.length) { el.innerHTML='<div class="no-msg">ยังไม่มีผลลัพธ์</div>'; return; }
+  el.innerHTML = rooms.map((r,i)=>`
+    <div class="room-card ${selIdx===i?'active':''}" onclick="selRoom(${i})">
+      <div class="room-swatch" style="background:${r.color}"></div>
+      <div class="room-info">
+        <div class="room-name">${r.custom_name || ('Room ' + r.room_id)}</div>
+        <div class="room-meta"><span>${r.area_m2} m²</span><span>${(r.area_px||0).toLocaleString()} px</span></div>
+      </div>
+      <div><div class="cbar-bg"><div class="cbar-fill" style="width:${r.confidence*100}%"></div></div><div class="cbar-num">${(r.confidence*100).toFixed(0)}%</div></div>
+    </div>`).join('');
+}
+
+function selRoom(i) {
+  selIdx=i; activeCorner=-1;
+  drawAll(); renderRoomList(); updSelInfo();
+}
+
+/* ================================================================
+   ACTIONS
+================================================================ */
+const ZONE_COLORS = ['#c9a880','#8ab0c8','#a8c890','#c8a8c0','#c8c090','#90b8c8','#c89080','#90c8a8'];
+
+function startAddZone() {
+  if (!bgImg) { alert('อัปโหลดภาพและวิเคราะห์ก่อนครับ'); return; }
+  isDrawing=true; drawPts=[];
+  selIdx=-1; activeCorner=-1;
+  const btn = document.getElementById('addZoneBtn');
+  btn.classList.add('drawing');
+  btn.textContent='⬤ กำลังวาด...';
+  document.getElementById('drawHint').classList.add('show');
+  cv.style.cursor='crosshair';
+  drawAll();
+}
+
+function finishZone() {
+  if (drawPts.length<3) { cancelZone(); return; }
+  const newRoom = {
+    room_id: rooms.length+1,
+    custom_name: 'Room ' + (rooms.length+1),
+    area_m2: 0, area_px: 0, confidence: 1.0,
+    centroid: [Math.round(drawPts.reduce((s,p)=>s+p[0],0)/drawPts.length), Math.round(drawPts.reduce((s,p)=>s+p[1],0)/drawPts.length)],
+    corners: drawPts.map(p=>[...p]),
+    color: ZONE_COLORS[rooms.length % ZONE_COLORS.length]
+  };
+  recalcRoom2(newRoom);
+  rooms.push(newRoom);
+  origRooms.push(JSON.parse(JSON.stringify(newRoom)));
+  selIdx = rooms.length-1;
+  cancelZone();
+  document.getElementById('totalCard')?.style.setProperty('display', 'flex');
+  document.getElementById('btn3d').disabled=false;
+  updTotal(); updJson(); renderRoomList(); updSelInfo(); drawAll();
+}
+
+function recalcRoom2(room) {
+  const mpp=parseFloat(document.getElementById('scale').value)||0.025;
+  const ap=polyArea(room.corners);
+  room.area_px=Math.round(ap);
+  room.area_m2=Math.round(ap*mpp*mpp*100)/100;
+}
+
+function cancelZone() {
+  isDrawing=false; drawPts=[];
+  const btn=document.getElementById('addZoneBtn');
+  btn.classList.remove('drawing');
+  btn.textContent='＋ เพิ่มโซน Polygon ใหม่';
+  document.getElementById('drawHint').classList.remove('show');
+  cv.style.cursor='crosshair';
+  drawAll();
+}
+
+function deleteSelectedCorner() {
+  if (selIdx<0||activeCorner<0) { alert('คลิกที่จุดสีขาวก่อน (จุดจะเปลี่ยนเป็นสีเหลือง)'); return; }
+  const pts=rooms[selIdx].corners;
+  if (pts.length<=3) { alert('ต้องมีอย่างน้อย 3 จุด'); return; }
+  pts.splice(activeCorner,1);
+  activeCorner=-1;
+  recalcRoom(selIdx);
+  drawAll(); updSelInfo(); updJson(); renderRoomList();
+}
+
+function resetRoom() {
+  if (selIdx<0||!origRooms[selIdx]) return;
+  rooms[selIdx]=JSON.parse(JSON.stringify(origRooms[selIdx]));
+  drawAll(); renderRoomList(); updSelInfo(); updJson();
+}
+
+function deleteRoom() {
+  if (selIdx<0) return;
+  if (!confirm('ลบ Room '+rooms[selIdx].room_id+' ออกจากแผนทั้งหมดใช่ไหม?')) return;
+  rooms.splice(selIdx,1);
+  selIdx=-1; activeCorner=-1;
+  updTotal(); updJson(); drawAll(); renderRoomList(); updSelInfo();
+}
+
+/* ================================================================
+   TAB / JSON / DOWNLOAD
+================================================================ */
+function switchTab(t) {
+  curTab=t;
+  ['edit','orig'].forEach(x=>document.getElementById('tab-'+x).className='tab'+(x===t?' active':''));
+  if (bgImg) drawAll();
+}
+
+function toggleJson() {
+  jsonOpen=!jsonOpen;
+  document.getElementById('jsonPre').style.display=jsonOpen?'block':'none';
+  if (jsonOpen) document.getElementById('jsonPre').textContent=JSON.stringify(resultJson,null,2);
+  document.getElementById('jsonBtn').innerHTML=(jsonOpen?'▼':'▶')+' ดู JSON';
+}
+
+function dlJson() {
+  if (!resultJson) return;
+  const { result_image, ...exportData } = resultJson;
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(exportData,null,2)],{type:'application/json'}));
+  a.download='rooms_edited.json'; a.click();
+}
+
+function toggleAdv() {
+  const btn = document.getElementById('advToggle');
+  const body = document.getElementById('advBody');
+  btn.classList.toggle('open');
+  body.classList.toggle('show');
+}
+
+function setLoad(on) {
+  document.getElementById('spinner').style.display=on?'block':'none';
+  document.getElementById('btnTxt').textContent=on?'กำลังประมวลผล...':'วิเคราะห์ด้วย AI';
+  document.getElementById('analyzeBtn').disabled=on;
+}
+
+function setStatus(type,msg) {
+  const el=document.getElementById('statusMsg');
+  el.style.display='block'; el.className='status '+type; el.textContent=msg;
+}
+
+/* ================================================================
+   3D ENGINE
+================================================================ */
+let t3scene,t3cam,t3ren,t3walls=[],t3floors=[];
+let t3init=false;
+let oTheta=0.6,oPhi=1.1,oR=20,oPX=0,oPZ=0,oDrag=false,oLX=0,oLY=0,oBtn=-1;
+
+function open3D() {
+  if (!rooms.length) return;
+  document.getElementById('modal3d').classList.add('show');
+  if (!t3init) initThree();
+  build3D();
+  document.getElementById('roomCount3d').textContent=rooms.length+' ห้อง';
+}
+function close3D() { document.getElementById('modal3d').classList.remove('show'); }
+
+function initThree() {
+  const c3=document.getElementById('threeCanvas');
+  const w=c3.clientWidth,h=c3.clientHeight;
+  t3scene=new THREE.Scene();
+  t3scene.background=new THREE.Color(0x0a0b0e);
+  t3scene.fog=new THREE.FogExp2(0x0a0b0e,0.018);
+  t3scene.add(new THREE.GridHelper(80,80,0x1a1d26,0x13151c));
+  const al=new THREE.AmbientLight(0xffffff,0.55); t3scene.add(al);
+  const dl=new THREE.DirectionalLight(0xfff5e0,1.3); dl.position.set(10,18,10); dl.castShadow=true; t3scene.add(dl);
+  const fl=new THREE.DirectionalLight(0xd0e8ff,0.3); fl.position.set(-8,10,-8); t3scene.add(fl);
+  t3cam=new THREE.PerspectiveCamera(50,w/h,0.1,300);
+  updOrbit();
+  t3ren=new THREE.WebGLRenderer({canvas:c3,antialias:true});
+  t3ren.setSize(w,h); t3ren.setPixelRatio(Math.min(devicePixelRatio,2));
+  t3ren.shadowMap.enabled=true; t3ren.shadowMap.type=THREE.PCFSoftShadowMap;
+  t3ren.toneMapping=THREE.ACESFilmicToneMapping; t3ren.toneMappingExposure=1.1;
+  setupOrbit3D();
+  window.addEventListener('resize',()=>{
+    const w2=c3.clientWidth,h2=c3.clientHeight;
+    if(!t3cam||!t3ren)return;
+    t3cam.aspect=w2/h2; t3cam.updateProjectionMatrix(); t3ren.setSize(w2,h2);
+  });
+  t3init=true;
+  (function loop(){requestAnimationFrame(loop);if(t3ren&&t3scene&&t3cam)t3ren.render(t3scene,t3cam);})();
+}
+
+function snapCorners(rList,px) {
+  const all=[]; rList.forEach((r,ri)=>r.corners.forEach((p,ci)=>all.push({x:p[0],z:p[1],ri,ci})));
+  const par=all.map((_,i)=>i);
+  const find=i=>par[i]===i?i:(par[i]=find(par[i]));
+  const union=(i,j)=>par[find(i)]=find(j);
+  for(let i=0;i<all.length;i++) for(let j=i+1;j<all.length;j++){
+    const dx=all[i].x-all[j].x,dz=all[i].z-all[j].z;
+    if(Math.sqrt(dx*dx+dz*dz)<=px) union(i,j);
+  }
+  const grp={};
+  all.forEach((p,i)=>{const r=find(i);if(!grp[r])grp[r]={xs:[],zs:[]};grp[r].xs.push(p.x);grp[r].zs.push(p.z);});
+  const rep={};
+  Object.entries(grp).forEach(([r,g])=>rep[r]=[g.xs.reduce((a,b)=>a+b)/g.xs.length,g.zs.reduce((a,b)=>a+b)/g.zs.length]);
+  const out=rList.map(r=>({...r,corners:r.corners.map(c=>[...c])}));
+  all.forEach((p,i)=>{const[nx,nz]=rep[find(i)];out[p.ri].corners[p.ci]=[nx,nz];});
+  return out;
+}
+
+function straightenPolygon(pts) {
+  if (pts.length < 3) return pts;
+  const n = pts.length;
+  const result = pts.map(p => [...p]);
+
+  for (let pass = 0; pass < 3; pass++) {
+    for (let i = 0; i < n; i++) {
+      const prev = result[(i - 1 + n) % n];
+      const curr = result[i];
+      const next = result[(i + 1) % n];
+
+      const dx1 = curr[0] - prev[0], dy1 = curr[1] - prev[1];
+      const ang1 = Math.abs(Math.atan2(dy1, dx1) * 180 / Math.PI);
+      const dx2 = next[0] - curr[0], dy2 = next[1] - curr[1];
+      const ang2 = Math.abs(Math.atan2(dy2, dx2) * 180 / Math.PI);
+
+      const isH1 = ang1 < 20 || ang1 > 160;
+      const isV1 = ang1 > 70 && ang1 < 110;
+      const isH2 = ang2 < 20 || ang2 > 160;
+      const isV2 = ang2 > 70 && ang2 < 110;
+
+      if (isH1) result[i][1] = prev[1];
+      else if (isV1) result[i][0] = prev[0];
+      if (isH2) result[i][1] = next[1];
+      else if (isV2) result[i][0] = next[0];
+    }
+  }
+  return result;
+}
+
+function straightenAllRooms(rList) {
+  return rList.map(r => ({
+    ...r,
+    corners: straightenPolygon(r.corners)
+  }));
+}
+
+function build3D() {
+  [...t3walls,...t3floors].forEach(m=>t3scene.remove(m));
+  t3walls=[]; t3floors=[];
+  const wH=parseFloat(document.getElementById('wallH').value)||2.8;
+  const wT=0.15;
+  const mpp=parseFloat(document.getElementById('scale').value)||0.025;
+  const wC=parseInt(document.getElementById('wallClr').value.replace('#',''),16);
+  const fC=parseInt(document.getElementById('floorClr').value.replace('#',''),16);
+  const straightened=straightenAllRooms(rooms);
+  const snapPx = Math.round((bgImg ? bgImg.naturalWidth : 1000) * 0.015);
+  const snapped=snapCorners(straightened, snapPx);
+  let mnX=Infinity,mnZ=Infinity,mxX=-Infinity,mxZ=-Infinity;
+  snapped.forEach(r=>r.corners.forEach(([x,z])=>{mnX=Math.min(mnX,x);mnZ=Math.min(mnZ,z);mxX=Math.max(mxX,x);mxZ=Math.max(mxZ,z);}));
+  const ox=(mnX+mxX)/2*mpp, oz=(mnZ+mxZ)/2*mpp;
+  const wMat=new THREE.MeshStandardMaterial({color:wC,roughness:.7,metalness:.02});
+  const fMat=new THREE.MeshStandardMaterial({color:fC,roughness:.85,metalness:0});
+  snapped.forEach(room=>{
+    const pts=room.corners; if(!pts||pts.length<3)return;
+    const mp=pts.map(([x,z])=>({x:x*mpp-ox,z:z*mpp-oz}));
+    const shape=new THREE.Shape();
+    shape.moveTo(mp[0].x,mp[0].z);
+    for(let i=1;i<mp.length;i++)shape.lineTo(mp[i].x,mp[i].z);
+    shape.closePath();
+
+    for(let i=0;i<mp.length;i++){
+      const a=mp[i],b=mp[(i+1)%mp.length];
+      const dx=b.x-a.x,dz=b.z-a.z,len=Math.sqrt(dx*dx+dz*dz);
+      if(len<0.01)continue;
+      const wm=new THREE.Mesh(new THREE.BoxGeometry(len,wH,wT),wMat);
+      wm.position.set((a.x+b.x)/2,wH/2,(a.z+b.z)/2);
+      wm.rotation.y=-Math.atan2(dz,dx);
+      wm.castShadow=true; wm.receiveShadow=true;
+      t3scene.add(wm); t3walls.push(wm);
+    }
+
+    const cc=document.createElement('canvas'); cc.width=256; cc.height=64;
+    const ct=cc.getContext('2d');
+    const labelTitle = room.custom_name || ('Room ' + room.room_id);
+    ct.font='bold 18px Syne,sans-serif'; ct.fillStyle=room.color||'#fff';
+    ct.textAlign='center'; ct.shadowColor='rgba(0,0,0,.9)'; ct.shadowBlur=5;
+    ct.fillText(labelTitle,128,24);
+    ct.font='12px JetBrains Mono,monospace'; ct.fillStyle='#ccc';
+    ct.fillText(room.area_m2+' m²',128,42);
+    const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cc),transparent:true,depthTest:false}));
+    sp.position.set(mp.reduce((s,p)=>s+p.x,0)/mp.length, wH+0.5, mp.reduce((s,p)=>s+p.z,0)/mp.length);
+    sp.scale.set(3,.75,1);
+    t3scene.add(sp); t3floors.push(sp);
+  });
+  const span=Math.max(mxX-mnX,mxZ-mnZ)*mpp;
+  oR=Math.max(span*1.6,12); oPX=0; oPZ=0; oTheta=0.6; oPhi=1.0;
+  updOrbit();
+}
+
+function rebuild3D(){if(t3init&&rooms.length)build3D();}
+
+function setupOrbit3D(){
+  const c3=document.getElementById('threeCanvas');
+  c3.addEventListener('mousedown',e=>{oDrag=true;oLX=e.clientX;oLY=e.clientY;oBtn=e.button;});
+  window.addEventListener('mouseup',()=>{oDrag=false;oBtn=-1;});
+  window.addEventListener('mousemove',e=>{
+    if(!oDrag)return;
+    const dx=e.clientX-oLX,dy=e.clientY-oLY; oLX=e.clientX; oLY=e.clientY;
+    if(oBtn===0){oTheta-=dx*.005;oPhi=Math.max(.12,Math.min(Math.PI/2-.04,oPhi-dy*.005));}
+    else if(oBtn===2){oPX-=dx*.03;oPZ-=dy*.03;}
+    updOrbit();
+  });
+  c3.addEventListener('wheel',e=>{oR=Math.max(2,Math.min(80,oR+e.deltaY*.04));updOrbit();},{passive:true});
+  c3.addEventListener('contextmenu',e=>e.preventDefault());
+}
+
+function updOrbit(){
+  if(!t3cam)return;
+  t3cam.position.set(oPX+oR*Math.sin(oPhi)*Math.sin(oTheta),oR*Math.cos(oPhi),oPZ+oR*Math.sin(oPhi)*Math.cos(oTheta));
+  t3cam.lookAt(oPX,0,oPZ);
+}
+</script>
+</body>
+</html>
